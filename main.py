@@ -93,12 +93,6 @@ while running:
             if event.key == pygame.K_ESCAPE:
                 running = False
 
-    state = get_game_state() # you should write your own function here
-    state_vec = state_to_vec(state) # convert the state to a vector representation
-    state_vec = torch.from_numpy(state_vec).float()
-    action_probs = agent.policy_network(state_vec)
-    action = torch.multinomial(action_probs, 1)
-
     # Update game state
     player1.update(ammo_packs, player2, clock)
     player2.update(ammo_packs, player1, clock)

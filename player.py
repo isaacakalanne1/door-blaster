@@ -23,65 +23,19 @@ class Player:
         self.last_bullet_time = 0
         self.elapsed_time = 0
 
-    def move(self, action):
-        # Unpack the action
-        left, right, up, down = action
-        # Check if the left key is pressed
-        if left:
+    def update(self, ammo_packs, other_player, clock):
+        # Update player position based on user input, but don't allow the player to go off the screen
+        keys = pygame.key.get_pressed()
+        if keys[self.left_key] and self.x > 0:
             self.x -= 5
-        # Check if the right key is pressed
-        if right:
+        if keys[self.right_key] and self.x < self.screen_width:
             self.x += 5
-        # Check if the up key is pressed
-        if up:
+        if keys[self.up_key] and self.y > 0:
             self.y -= 5
-        # Check if the down key is pressed
-        if down:
+        if keys[self.down_key] and self.y < self.screen_height:
             self.y += 5
-        # Check if the player goes out of bounds
-        self.x = max(0, min(self.x, self.screen_width))
-        self.y = max(0, min(self.y, self.screen_height))
 
         self.start_pos = (self.x, self.y)
-
-    def shoot(self, action):
-        # Unpack the action
-        left, right, up, down = action
-
-        self.elapsed_time = pygame.time.get_ticks()
-
-        # Check if the player has ammo
-        if self.ammo > 0 and self.elapsed_time - self.last_bullet_time >= 250:
-            # Check if the left key is pressed
-            if left:
-                # Create a bullet that moves to the left
-                new_bullet = Bullet(self.x, self.y, (-5, 0))
-                self.bullets.append(new_bullet)
-                self.ammo -= 1
-                self.last_bullet_time = pygame.time.get_ticks()
-            # Check if the right key is pressed
-            if right:
-                # Create a bullet that moves to the right
-                new_bullet = Bullet(self.x, self.y, (5, 0))
-                self.bullets.append(new_bullet)
-                self.ammo -= 1
-                self.last_bullet_time = pygame.time.get_ticks()
-            # Check if the up key is pressed
-            if up:
-                # Create a bullet that moves up
-                new_bullet = Bullet(self.x, self.y, (0, -5))
-                self.bullets.append(new_bullet)
-                self.ammo -= 1
-                self.last_bullet_time = pygame.time.get_ticks()
-            # Check if the down key is pressed
-            if down:
-                # Create a bullet that moves down
-                new_bullet = Bullet(self.x, self.y, (0, 5))
-                self.bullets.append(new_bullet)
-                self.ammo -= 1
-                self.last_bullet_time = pygame.time.get_ticks()
-
-    def update(self, ammo_packs, other_player):
 
         player_radius = 10
 
@@ -102,6 +56,31 @@ class Player:
                 # Transfer all of the player's ammo to the other player
                 other_player.ammo += self.ammo
                 self.ammo = 0
+
+        self.elapsed_time = pygame.time.get_ticks()
+
+        # Shoot a bullet in the specified direction if the player has ammo and the shoot key is pressed
+        if self.shoot_key is not None and self.ammo > 0 and self.elapsed_time - self.last_bullet_time >= 250:
+
+            speed = 3
+
+            # Check for number keys 1, 2, 3, or 4
+            if keys[pygame.K_1]:
+                self.bullets.append(Bullet(x=self.x, y=self.y, direction=(-speed, 0)))
+                self.ammo -= 1
+                self.last_bullet_time = pygame.time.get_ticks()
+            elif keys[pygame.K_2]:
+                self.bullets.append(Bullet(x=self.x, y=self.y, direction=(0, speed)))
+                self.ammo -= 1
+                self.last_bullet_time = pygame.time.get_ticks()
+            elif keys[pygame.K_3]:
+                self.bullets.append(Bullet(x=self.x, y=self.y, direction=(speed, 0)))
+                self.ammo -= 1
+                self.last_bullet_time = pygame.time.get_ticks()
+            elif keys[pygame.K_4]:
+                self.bullets.append(Bullet(x=self.x, y=self.y, direction=(0, -speed)))
+                self.ammo -= 1
+                self.last_bullet_time = pygame.time.get_ticks()
 
         # Update bullet positions
         for b in self.bullets:
