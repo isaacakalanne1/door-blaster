@@ -1,5 +1,3 @@
-
-
 from gameenv import GameEnv
 
 env = GameEnv()
