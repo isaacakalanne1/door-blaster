@@ -62,7 +62,7 @@ class PPO:
                 optimizer.step()
 
     def train(self, n_episodes):
-        scoresCount = []
+        scores_list = []
         for episode in range(n_episodes):
             state = self.game_env.reset()
             score = 0
@@ -80,10 +80,10 @@ class PPO:
                 self.update(self.agent2, self.optimizer2, states, actions, old_action_probs, reward, done)
                 state = next_state
                 if done:
-                    scoresCount.append(score)
+                    scores_list.append(score)
                     print("Episode: {}, Score: {}".format(episode, score))
                     break
-        return scoresCount
+        return scores_list
 
 
 if __name__ == 'main':
