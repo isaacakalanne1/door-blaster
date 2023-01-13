@@ -1,13 +1,29 @@
 from player import Player
-from enemy import  Enemy
+from enemy import Enemy
 from door import Door
-
+from ammopack import AmmoPack
+import random
+import time
 import pygame
+
 
 class GameEnv:
     def __init__(self):
+
+        pygame.init()
         self.screen_width = 640
         self.screen_height = 480
+        # Set up the Pygame window
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+
+        # Create a clock object to control the framerate
+        self.clock = pygame.time.Clock()
+
+        # Set up a timer to keep track of elapsed time
+        self.ammo_pack_timer = time.perf_counter()
+
+        self.last_spawn_time = pygame.time.get_ticks()
+
         self.player1 = Player(start_pos=(200, 200), color=(255, 0, 0), left_key=pygame.K_a, right_key=pygame.K_d,
                               up_key=pygame.K_w,
                               down_key=pygame.K_s, screen_width=self.screen_width, screen_height=self.screen_height,
@@ -22,75 +38,120 @@ class GameEnv:
         self.ammo_packs = []
         self.door = Door(screen_height=self.screen_height, screen_width=self.screen_width)
 
-    def reset(self):
-        self.player1.x, self.player1.y = 200, 200
-        self.player2.x, self.player2.y = 300, 300
-        self.enemies.clear()
-        self.ammo_packs.clear()
-        self.door.health = 100
-        return [self.player1.x, self.player1.y, self.player2.x, self.player2.y, *[e.x for e in self.enemies],
-                *[e.y for e in self.enemies], *[a.x for a in self.ammo_packs], *[a.y for a in self.ammo_packs]]
+    def reset_game(self, did_succeed_level):
+        # Reset game objects
 
-    def step(self, action):
-        self.player1.move(action[:4])
-        self.player1.shoot(action[4:])
-        self.player2.move(action[4:])
-        done = self.door.health == 0
-        reward = -1 if done else 1
-        return [self.player1.x, self.player1.y, self.player2.x, self.player2.y,
-                *[e.x for e in self.enemies],
-                *[e.y for e in self.enemies],
-                *[a.x for a in self.ammo_packs],
-                *[a.y for a in self.ammo_packs]],\
-            reward,\
-            done,\
-            None
+        self.player1 = Player(start_pos=(200, 200), color=(255, 0, 0), left_key=pygame.K_a, right_key=pygame.K_d,
+                              up_key=pygame.K_w,
+                              down_key=pygame.K_s, screen_width=self.screen_width, screen_height=self.screen_height,
+                              shoot_key=pygame.K_SPACE, can_collect_ammo=False)
+        self.player2 = Player(start_pos=(300, 300), color=(0, 0, 255), left_key=pygame.K_LEFT, right_key=pygame.K_RIGHT,
+                              up_key=pygame.K_UP,
+                              down_key=pygame.K_DOWN, screen_width=self.screen_width, screen_height=self.screen_height,
+                              can_collect_ammo=True)
+        self.players = [self.player1, self.player2]
+        self.enemies = []
+        self.enemy = Enemy(screen_height=self.screen_height, screen_width=self.screen_width, enemies=self.enemies)
+        self.ammo_packs = []
+        self.door = Door(screen_height=self.screen_height, screen_width=self.screen_width)
+
+    def spawn_ammo_pack(self, packs):
+
+        # Generate random coordinates within the screen bounds
+        x = random.randint(0, self.screen_width)
+        y = random.randint(0, self.screen_height)
+
+        # Don't spawn a new ammo pack if there are already two on the screen
+        if len(packs) >= 2:
+            return
+
+        # Get the current time
+        current_time = time.perf_counter()
+
+        # Spawn a new ammo pack every 5 seconds
+        if current_time - self.ammo_pack_timer > 5:
+            self.ammo_packs.append(AmmoPack(x, y))
+            self.ammo_pack_timer = current_time
 
     def run_game_loop(self):
-        # Initialize Pygame
-        pygame.init()
-        # Set up the Pygame window
-        screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-        # Create a clock object to control the framerate
-        clock = pygame.time.Clock()
+        # Main game loop
         running = True
         while running:
             # Handle events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-            # Clear the screen
-            screen.fill((0, 0, 0))
-            # Draw the players, enemies, ammo packs, and door
-            self.player1.draw(screen)
-            self.player2.draw(screen)
-            for enemy in self.enemies:
-                enemy.draw(screen)
-            for ammo_pack in self.ammo_packs:
-                ammo_pack.draw(screen)
-            self.door.draw(screen)
-            # Update the players, enemies, ammo packs, and door
-            self.player1.update(self.ammo_packs, self.player2)
-            self.player2.update(self.ammo_packs, self.player1)
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        running = False
+
+            # Update game state
+            self.player1.update(self.ammo_packs, self.player2, self.clock)
+            self.player2.update(self.ammo_packs, self.player1, self.clock)
             for enemy in self.enemies:
                 enemy.update()
+
+            # Check for collisions between player.py bullets and enemies
+            for player in self.players:
+                for bullet in player.bullets:
+                    for enemy in self.enemies:
+                        if bullet.collides_with(enemy):
+                            player.bullets.remove(bullet)
+
+            for player in self.players:
+                player.draw(self.screen)
+            # Check if it's time to spawn a new enemy
+            current_time = pygame.time.get_ticks()
+            if current_time - self.last_spawn_time > random.randint(1000, 1500) and len(self.enemies) < 10:
+                self.enemies.append(Enemy(screen_height=self.screen_height,
+                                          screen_width=self.screen_width,
+                                          enemies=self.enemies))
+                self.last_spawn_time = current_time
+
+            for enemy in self.enemies:
+                enemy.draw(self.screen)
+
+            self.spawn_ammo_pack(self.ammo_packs)
+
             for ammo_pack in self.ammo_packs:
-                ammo_pack.update()
+                ammo_pack.draw(self.screen)
+
             self.door.update(self.player1.bullets + self.player2.bullets)
-            # Check for collisions
+
+            self.door.draw(self.screen)
+
             for enemy in self.enemies:
                 if self.player1.is_colliding(enemy) or self.player2.is_colliding(enemy):
-                    running = False
-            for ammo_pack in self.ammo_packs:
-                if self.player2.is_colliding(ammo_pack):
-                    self.player2.ammo += ammo_pack.ammo
-                    self.ammo_packs.remove(ammo_pack)
-            if self.player1.is_colliding(self.door) and self.door.health == 0:
-                running = False
-            # Update the screen
-            pygame.display.flip()
-            # Wait for the next frame
-            clock.tick(60)
-        # Quit Pygame
-        pygame.quit()
+                    # reset the game
+                    self.reset_game(did_succeed_level=False)
+                    break
 
+            # Check if both players are touching the door
+            if self.door.color == (0, 255, 0) \
+                    and self.door.x - self.door.size < self.player1.x < self.door.x + self.door.size \
+                    and self.door.y - self.door.size < self.player1.y < self.door.y + self.door.size \
+                    and self.door.x - self.door.size < self.player2.x < self.door.x + self.door.size \
+                    and self.door.y - self.door.size < self.player2.y < self.door.y + self.door.size:
+                # Reset game objects
+                self.reset_game(did_succeed_level=True)
+
+            # Initialize the font
+            font = pygame.font.Font(None, 36)
+
+            # Create a text surface and rect to hold the text
+            text_surface = font.render(f"Ammo: {self.player1.ammo}", True, (0, 0, 0))
+            text_rect = text_surface.get_rect()
+
+            # Set the text rect to the top left corner of the screen
+            text_rect.topleft = (10, 10)
+
+            # Draw the text to the screen
+            self.screen.blit(text_surface, text_rect)
+
+            pygame.display.flip()
+
+            # Limit the frame-rate to 60 fps
+            self.clock.tick(60)
+
+            # Draw the game to the screen
+            self.screen.fill((255, 255, 255))  # Fill the screen with white
