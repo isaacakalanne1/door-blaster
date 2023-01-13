@@ -7,6 +7,7 @@ import torch.optim as optim
 from torch.distributions.categorical import Categorical
 from gameenv import GameEnv
 
+
 class PPO_Memory:
     def __init__(self, batch_size):
         self.states = []
@@ -49,6 +50,7 @@ class PPO_Memory:
         self.dones = []
         self.vals = []
 
+
 class ActorNetwork(nn.Module):
 
     def __init__(self, n_actions, input_dims, alpha, fc1_dims=256, fc2_dims=256, chkpt_dir='tmp/ppo'):
@@ -79,86 +81,119 @@ class ActorNetwork(nn.Module):
     def load_checkpoint(self):
         self.load_state_dict(T.load(self.checkpoint_file))
 
-class CriticNetwork(nn.Module)
+
+class CriticNetwork(nn.Module):
 
     def __init__(self, input_dims, alpha, fc1_dims=256, fc2_dims=256, chkpt_dir='tmp/ppo'):
         super(CriticNetwork, self).__init__()
 
         self.checkpoint_file = os.path.join(chkpt_dir, 'critic_torch_ppo')
         self.critic = nn.Sequential(
-            nn.
+            nn.Linear(*input_dims, fc1_dims),
+            nn.ReLU(),
+            nn.Linear(fc1_dims, fc2_dims),
+            nn.ReLU(),
+            nn.Linear(fc2_dims, 1)
         )
 
+        self.optimizer = optim.Adam(self.parameters(), lr=alpha)
+        self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
+        self.to(self.device)
 
-class PPOAgent(nn.Module):
-    def __init__(self, state_sz, action_sz):
-        super(PPOAgent, self).__init__()
-        self.fc1 = nn.Linear(state_sz, 64)
-        self.fc2 = nn.Linear(64, 64)
-        self.fc3 = nn.Linear(64, action_sz)
+    def forward(self, state):
+        value = self.critic(state)
 
-    def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
+        return value
 
+    def save_checkpoint(self):
+        T.save(self.state_dict(), self.checkpoint_file)
 
-class PPO:
-    def __init__(self, state_sz, action_sz, clip_epsilon=0.2, ppo_epochs=10, mini_batch_size=64, learning_rate=3e-4):
-        self.state_size = state_sz
-        self.action_size = action_sz
-        self.clip_epsilon = clip_epsilon
-        self.ppo_epochs = ppo_epochs
-        self.mini_batch_size = mini_batch_size
-        self.learning_rate = learning_rate
-        self.agent1 = PPOAgent(state_sz, action_sz)
-        self.agent2 = PPOAgent(state_sz, action_sz)
-        self.optimizer1 = optim.Adam(self.agent1.parameters(), lr=learning_rate)
-        self.optimizer2 = optim.Adam(self.agent2.parameters(), lr=learning_rate)
-        self.game_env = GameEnv()
+    def load_checkpoint(self):
+        self.load_state_dict(T.load(self.checkpoint_file))
 
-    def update(self, agent, optimizer, states, actions, old_action_probs, rewards, dones):
-        for _ in range(self.ppo_epochs):
-            for state, action, old_action_prob, reward, done in zip(states, actions, old_action_probs, rewards, dones):
-                action_probs = get_action(state, agent)
-                prob = action_probs.squeeze(0)[action]
-                ratio = prob / old_action_prob
-                advantage = reward - (1 - done)
-                surr1 = ratio * advantage
-                surr2 = torch.clamp(ratio, 1 - self.clip_epsilon, 1 + self.clip_epsilon) * advantage
-                loss = -torch.min(surr1, surr2)
-                optimizer.zero_grad()
-                loss.mean().backward()
-                optimizer.step()
+class ShooterAgent:
+    def __init__(self, n_actions, input_dims, gamma=0.99, alpha=0.0003, gae_lambda=0.95, policy_clip=0.2, batch_size=64, N=2048, n_epochs=10):
+        self.gamma = gamma
+        self.policy_clip = policy_clip
+        self.n_epochs = n_epochs
+        self.gae_lambda = gae_lambda
+        self.actor = ActorNetwork(n_actions, input_dims, alpha)
+        self.critic = CriticNetwork(input_dims, alpha)
+        self.memory = PPO_Memory(batch_size)
 
-    def train(self, n_episodes):
-        scores_list = []
-        for episode in range(n_episodes):
-            state = self.game_env.reset()
-            score = 0
-            while True:
-                action1 = select_action(state, self.agent1)
-                action2 = select_action(state, self.agent2)
-                actions = [action1, action2]
-                old_action_probs1 = get_action(torch.FloatTensor(state).unsqueeze(0), self.agent1).detach()
-                old_action_probs2 = get_action(torch.FloatTensor(state).unsqueeze(0), self.agent2).detach()
-                old_action_probs = [old_action_probs1, old_action_probs2]
-                next_state, reward, done, = self.game_env.step(actions)
-                score += reward
-                states = [torch.FloatTensor(state).unsqueeze(0), torch.FloatTensor(state).unsqueeze(0)]
-                self.update(self.agent1, self.optimizer1, states, actions, old_action_probs, reward, done)
-                self.update(self.agent2, self.optimizer2, states, actions, old_action_probs, reward, done)
-                state = next_state
-                if done:
-                    scores_list.append(score)
-                    print("Episode: {}, Score: {}".format(episode, score))
-                    break
-        return scores_list
+    def remember(self, state, action, probs, vals, reward, done):
+        self.memory.store_memory(state, action, probs, vals, reward, done)
 
+    def save_models(self):
+        print('... Saving models ...')
+        self.actor.save_checkpoint()
+        self.critic.save_checkpoint()
 
-if __name__ == 'main':
-    state_size = len(GameEnv().reset())
-    action_size = 8
-    ppo = PPO(state_size, action_size)
-    scores = ppo.train(n_episodes=1000)
+    def load_models(self):
+        print('... Loading models ...')
+        self.actor.load_checkpoint()
+        self.critic.load_checkpoint()
+
+    def choose_action(self, observation):
+        state = T.tensor([observation], dtype=T.float).to(self.actor.device)
+
+        dist = self.actor(state)
+        value = self.critic(state)
+        action = dist.sample()
+
+        probs = T.squeeze(dist.log_prob(action)).item()
+        action = T.squeeze(action).item()
+        value = T.squeeze(value).item()
+
+        return action, probs, value
+
+    def learn(self):
+        for _ in range(self.n_epochs):
+            state_arr, action_arr, old_probs_arr, vals_arr,\
+                reward_arr, done_arr, batches = \
+                self.memory.generate_batches()
+
+            values = vals_arr
+            advantage = np.zeros(len(reward_arr), dtype=np.float32)
+
+            for t in range(len(reward_arr) - 1):
+                discount = 1
+                a_t = 0
+                for k in range(t, len(reward_arr) - 1):
+                    a_t += discount*(reward_arr[k] + self.gamma*values[k+1])
+                    discount *= self.gamma*self.gae_lambda
+                advantage[t] = a_t
+            advantage = T.tensor(advantage).to(self.actor.device)
+
+            values = T.tensor(values).to(self.actor.device)
+            for batch in batches:
+                states = T.tensor(state_arr[batch], dtype=T.float).to(self.actor.device)
+                old_probs = T.tensor(old_probs_arr[batch]).to(self.actor.device)
+                actions = T.tensor(action_arr[batch]).to(self.actor.device)
+
+                dist = self.actor(states)
+                critic_value = self.critic(states)
+
+                critic_value = T.squeeze(critic_value)
+
+                new_probs = dist.log_prob(actions)
+                prob_ratio = new_probs.exp() / old_probs.exp()
+                # prob_ratio = (new_probs -old_probs).exp()
+                weighted_probs = advantage[batch] * prob_ratio
+                weighted_clipped_probs = T.clamp(prob_ratio, 1 - self.policy_clip, 1 + self.policy_clip)*advantage[batch]
+                actor_loss = -T.min(weighted_probs, weighted_clipped_probs).mean()
+
+                returns = advantage[batch] + values[batch]
+                critic_loss = (returns - critic_value)**2
+                critic_loss = critic_loss.mean()
+
+                total_loss = actor_loss + 0.5*critic_loss
+
+                self.actor.optimizer.zero_grad()
+                self.critic.optimizer.zero_grad()
+
+                total_loss.backward()
+                self.actor.optimizer.step()
+                self.critic.optimizer.step()
+
+        self.memory.clear_memory()
