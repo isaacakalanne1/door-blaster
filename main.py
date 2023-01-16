@@ -1,6 +1,7 @@
 from gameenv import GameEnv
-from ppo import ShooterAgent
+from ppo import Agent
 from utils import plot_learning_curve
+import numpy as np
 
 if __name__ == '__main__':
     env = GameEnv()
@@ -8,10 +9,8 @@ if __name__ == '__main__':
     batch_size = 5
     n_epochs = 4
     alpha = 0.0003
-    shooterAgent = ShooterAgent(n_actions=env.shooter_action_space.n, batch_size=batch_size, alpha=alpha,
-                                n_epochs=n_epochs, input_dims=env.observation_space.shape)
-    collectorAgent = ShooterAgent(n_actions=env.collector_action_space.n, batch_size=batch_size, alpha=alpha,
-                                  n_epochs=n_epochs, input_dims=env.observation_space.shape)
+    shooterAgent = Agent(n_actions=9, batch_size=batch_size, alpha=alpha, n_epochs=n_epochs, input_dims=35)
+    collectorAgent = Agent(n_actions=5, batch_size=batch_size, alpha=alpha, n_epochs=n_epochs, input_dims=35)
     n_games = 300
 
     figure_file = 'plots/cartpole.png'
@@ -26,31 +25,45 @@ if __name__ == '__main__':
     env.run_game_loop()
 
     for i in range(n_games):
-        observation = env.reset_game()
+        env.reset_game()
+        s_observation = env.get_starting_shooter_obs()
+        c_observation = env.get_starting_collector_obs()
         done = False
         score = 0
         while not done:
-            action, prob, val = shooterAgent.choose_action(observation)
-            observation_, reward, done, info = env.step(action)
+            s_action, s_prob, s_val = shooterAgent.choose_action(s_observation)
+            c_action, c_prob, c_val = collectorAgent.choose_action(c_observation)
+
+            ((s_observation_, s_reward, s_done),
+             (c_observation_, c_reward, c_done)) = env.take_game_step(s_action, c_action)
+
+            if s_done:
+                done = s_done
+
+            if c_done:
+                done = c_done
+
             n_steps += 1
-            score += reward
-            shooterAgent.remember(observation, action, prob, val, reward, done)
+            score += s_reward + c_reward
+
+            shooterAgent.remember(s_observation, s_action, s_prob, s_val, s_reward, done)
+            collectorAgent.remember(c_observation, c_action, c_prob, c_val, c_reward, done)
+
             if n_steps % N == 0:
                 shooterAgent.learn()
+                collectorAgent.learn()
                 learn_iters += 1
-            observation = observation_
+            s_observation = s_observation_
+            c_observation = c_observation_
         score_history.append(score)
         avg_score = np.mean(score_history[-100:])
 
         if avg_score > best_score:
             best_score = avg_score
             shooterAgent.save_models()
+            collectorAgent.save_models()
 
-        print('episode', i, 'score %.1f' % score, 'avg score %.1f' % avg_score, 'time_steps', n_steps, 'learning_steps', learn_iters)
+        print('episode', i, 'score %.1f' % score, 'avg score %.1f' % avg_score, 'time_steps', n_steps,
+              'learning_steps', learn_iters)
         x = [i+1 for i in range(len(score_history))]
         plot_learning_curve(x, score_history, figure_file)
-
-
-running = True
-while running:
-    break

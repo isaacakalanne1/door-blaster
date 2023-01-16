@@ -111,7 +111,8 @@ class CriticNetwork(nn.Module):
     def load_checkpoint(self):
         self.load_state_dict(T.load(self.checkpoint_file))
 
-class ShooterAgent:
+
+class Agent:
     def __init__(self, n_actions, input_dims, gamma=0.99, alpha=0.0003, gae_lambda=0.95, policy_clip=0.2, batch_size=64, N=2048, n_epochs=10):
         self.gamma = gamma
         self.policy_clip = policy_clip

@@ -5,34 +5,30 @@ import math
 Bullet = bullet.Bullet
 
 class Player:
-    def __init__(self, start_pos, color, left_key, right_key, up_key, down_key, screen_width, screen_height, can_collect_ammo, shoot_key=None):
+    def __init__(self, start_pos, color, screen_width, screen_height, can_collect_ammo, can_shoot):
         self.x, self.y = start_pos
         self.start_pos = start_pos
         self.color = color
         self.bullets = []
-        self.left_key = left_key
-        self.right_key = right_key
-        self.up_key = up_key
-        self.down_key = down_key
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.shoot_key = shoot_key
+        self.can_shoot = can_shoot
         self.can_collect_ammo = can_collect_ammo
         self.ammo = 10
         self.size = 10
         self.last_bullet_time = 0
         self.elapsed_time = 0
 
-    def update(self, ammo_packs, other_player, clock):
+    def update(self, action, ammo_packs, other_player):
         # Update player position based on user input, but don't allow the player to go off the screen
         keys = pygame.key.get_pressed()
-        if keys[self.left_key] and self.x > 0:
+        if action == 1 and self.x > 0:
             self.x -= 5
-        if keys[self.right_key] and self.x < self.screen_width:
+        if action == 2 and self.x < self.screen_width:
             self.x += 5
-        if keys[self.up_key] and self.y > 0:
+        if action == 3 and self.y > 0:
             self.y -= 5
-        if keys[self.down_key] and self.y < self.screen_height:
+        if action == 4 and self.y < self.screen_height:
             self.y += 5
 
         self.start_pos = (self.x, self.y)
@@ -60,24 +56,23 @@ class Player:
         self.elapsed_time = pygame.time.get_ticks()
 
         # Shoot a bullet in the specified direction if the player has ammo and the shoot key is pressed
-        if self.shoot_key is not None and self.ammo > 0 and self.elapsed_time - self.last_bullet_time >= 250:
+        if self.can_shoot and self.ammo > 0 and self.elapsed_time - self.last_bullet_time >= 250:
 
             speed = 3
 
-            # Check for number keys 1, 2, 3, or 4
-            if keys[pygame.K_1]:
+            if action == 5:
                 self.bullets.append(Bullet(x=self.x, y=self.y, direction=(-speed, 0)))
                 self.ammo -= 1
                 self.last_bullet_time = pygame.time.get_ticks()
-            elif keys[pygame.K_2]:
+            elif action == 6:
                 self.bullets.append(Bullet(x=self.x, y=self.y, direction=(0, speed)))
                 self.ammo -= 1
                 self.last_bullet_time = pygame.time.get_ticks()
-            elif keys[pygame.K_3]:
+            elif action == 7:
                 self.bullets.append(Bullet(x=self.x, y=self.y, direction=(speed, 0)))
                 self.ammo -= 1
                 self.last_bullet_time = pygame.time.get_ticks()
-            elif keys[pygame.K_4]:
+            elif action == 8:
                 self.bullets.append(Bullet(x=self.x, y=self.y, direction=(0, -speed)))
                 self.ammo -= 1
                 self.last_bullet_time = pygame.time.get_ticks()
