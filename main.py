@@ -9,8 +9,8 @@ if __name__ == '__main__':
     batch_size = 5
     n_epochs = 4
     alpha = 0.0003
-    shooterAgent = Agent(n_actions=9, batch_size=batch_size, alpha=alpha, n_epochs=n_epochs, input_dims=35)
-    collectorAgent = Agent(n_actions=5, batch_size=batch_size, alpha=alpha, n_epochs=n_epochs, input_dims=35)
+    shooterAgent = Agent(n_actions=9, input_dims=env.get_shooter_state().shape, batch_size=batch_size, alpha=alpha, n_epochs=n_epochs)
+    collectorAgent = Agent(n_actions=5, input_dims=env.get_collector_state().shape, batch_size=batch_size, alpha=alpha, n_epochs=n_epochs)
     n_games = 300
 
     figure_file = 'plots/cartpole.png'
@@ -22,12 +22,10 @@ if __name__ == '__main__':
     ag_score = 0
     n_steps = 0
 
-    env.run_game_loop()
-
     for i in range(n_games):
         env.reset_game()
-        s_observation = env.get_starting_shooter_obs()
-        c_observation = env.get_starting_collector_obs()
+        s_observation = env.get_shooter_state()
+        c_observation = env.get_collector_state()
         done = False
         score = 0
         while not done:

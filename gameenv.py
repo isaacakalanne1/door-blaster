@@ -5,6 +5,7 @@ from ammopack import AmmoPack
 import random
 import time
 import pygame
+import numpy as np
 
 
 class GameEnv:
@@ -13,6 +14,8 @@ class GameEnv:
         pygame.init()
         self.screen_width = 640
         self.screen_height = 480
+        self.max_enemies = 10
+        self.max_ammo_packs = 2
         # Set up the Pygame window
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
 
@@ -36,7 +39,6 @@ class GameEnv:
 
     def reset_game(self):
         # Reset game objects
-
         self.player1 = Player(start_pos=(200, 200), color=(255, 0, 0), screen_width=self.screen_width,
                               screen_height=self.screen_height, can_shoot=True, can_collect_ammo=False)
         self.player2 = Player(start_pos=(300, 300), color=(0, 0, 255), screen_width=self.screen_width,
@@ -47,11 +49,54 @@ class GameEnv:
         self.ammo_packs = []
         self.door = Door(screen_height=self.screen_height, screen_width=self.screen_width)
 
-    def get_starting_shooter_obs(self):
-        return 0
+    def get_shooter_state(self):
+        return self.get_state(ego_player=self.player1, other_player=self.player2)
 
-    def get_starting_collector_obs(self):
-        return 0
+    def get_collector_state(self):
+        return self.get_state(ego_player=self.player1, other_player=self.player2)
+
+    def get_state(self, ego_player, other_player):
+        state = [
+            # Distance from 4 walls
+            ego_player.x,
+            self.screen_width - ego_player.x,
+            ego_player.y,
+            self.screen_height - ego_player.y,
+            # Relative position of door
+            self.door.x - ego_player.x,
+            self.door.y - ego_player.y,
+            # Current ammo
+            ego_player.ammo,
+            # Ammo of other player
+            other_player.ammo,
+            # Relative position of other player
+            other_player.x - ego_player.x,
+            other_player.y - ego_player.y,
+            # Door health
+            self.door.health
+        ]
+
+        # Relative position of enemies
+        for i in range(self.max_enemies):
+            if i < len(self.enemies):
+                enemy = self.enemies[i]
+                state.append(enemy.x - ego_player.x)
+                state.append(enemy.y - ego_player.y)
+            else:
+                state.append(0)
+                state.append(0)
+
+        # Relative distance of ammo packs
+        for i in range(self.max_ammo_packs):
+            if i < len(self.ammo_packs):
+                ammo_pack = self.ammo_packs[i]
+                state.append(ammo_pack.x - ego_player.x)
+                state.append(ammo_pack.y - ego_player.y)
+            else:
+                state.append(0)
+                state.append(0)
+
+        return np.array(state)
 
     def spawn_ammo_pack(self, packs):
 
@@ -60,7 +105,7 @@ class GameEnv:
         y = random.randint(0, self.screen_height)
 
         # Don't spawn a new ammo pack if there are already two on the screen
-        if len(packs) >= 2:
+        if len(packs) >= self.max_ammo_packs:
             return
 
         # Get the current time
@@ -70,9 +115,6 @@ class GameEnv:
         if current_time - self.ammo_pack_timer > 5:
             self.ammo_packs.append(AmmoPack(x, y))
             self.ammo_pack_timer = current_time
-
-    def get_shooter_observation(self):
-        return [0]
 
     def take_game_step(self, s_action, c_action):
         reward = 0
@@ -103,7 +145,7 @@ class GameEnv:
             player.draw(self.screen)
         # Check if it's time to spawn a new enemy
         current_time = pygame.time.get_ticks()
-        if current_time - self.last_spawn_time > random.randint(1000, 1500) and len(self.enemies) < 10:
+        if current_time - self.last_spawn_time > random.randint(1000, 1500) and len(self.enemies) < self.max_enemies:
             self.enemies.append(Enemy(screen_height=self.screen_height,
                                       screen_width=self.screen_width,
                                       enemies=self.enemies))
@@ -157,10 +199,4 @@ class GameEnv:
         # Draw the game to the screen
         self.screen.fill((255, 255, 255))  # Fill the screen with white
 
-        return (self.get_shooter_observation(), done), (self.get_shooter_observation(), done)
-
-    def run_game_loop(self):
-        # Main game loop
-        running = True
-        while running:
-            self.take_game_step()
+        return (self.get_shooter_state(), 0, done), (self.get_collector_state(), 0, done)
