@@ -5,7 +5,7 @@ import torch as T
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions.categorical import Categorical
-from gameenv import GameEnv
+import random
 
 
 class PPO_Memory:
@@ -118,9 +118,12 @@ class Agent:
         self.policy_clip = policy_clip
         self.n_epochs = n_epochs
         self.gae_lambda = gae_lambda
+        self.n_actions = n_actions
         self.actor = ActorNetwork(n_actions, input_dims, alpha)
         self.critic = CriticNetwork(input_dims, alpha)
         self.memory = PPO_Memory(batch_size)
+        self.number_of_games = 0
+        self.epsilon = 0
 
     def remember(self, state, action, probs, vals, reward, done):
         self.memory.store_memory(state, action, probs, vals, reward, done)
@@ -136,16 +139,23 @@ class Agent:
         self.critic.load_checkpoint()
 
     def choose_action(self, observation):
+        self.epsilon = 80 - self.number_of_games
         observation = np.array(observation)
         state = T.tensor(observation, dtype=T.float).to(self.actor.device)
 
-        dist = self.actor(state)
-        value = self.critic(state)
-        action = dist.sample()
+        if random.randint(0, 200) < self.epsilon:
+            # Choose a random action
+            action = random.randint(0, self.n_actions - 1)
+            probs = 0
+            value = 0
+        else:
+            dist = self.actor(state)
+            value = self.critic(state)
+            action = dist.sample()
 
-        probs = T.squeeze(dist.log_prob(action)).item()
-        action = T.squeeze(action).item()
-        value = T.squeeze(value).item()
+            probs = T.squeeze(dist.log_prob(action)).item()
+            action = T.squeeze(action).item()
+            value = T.squeeze(value).item()
 
         return action, probs, value
 

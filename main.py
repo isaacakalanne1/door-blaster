@@ -6,7 +6,7 @@ import numpy as np
 if __name__ == '__main__':
     env = GameEnv()
     N = 20
-    batch_size = 5
+    batch_size = 500
     n_epochs = 4
     alpha = 0.0003
     shooterAgent = Agent(n_actions=9, input_dims=env.get_shooter_state().shape, batch_size=batch_size, alpha=alpha, n_epochs=n_epochs)
@@ -25,6 +25,8 @@ if __name__ == '__main__':
 
     for i in range(n_games):
         env.reset_game()
+        shooterAgent.number_of_games += 1
+        collectorAgent.number_of_games += 1
         s_observation = env.get_shooter_state()
         c_observation = env.get_collector_state()
         done = False

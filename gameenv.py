@@ -50,6 +50,8 @@ class GameEnv:
         self.enemy = Enemy(screen_height=self.screen_height, screen_width=self.screen_width, enemies=self.enemies)
         self.ammo_packs = []
         self.door = Door(screen_height=self.screen_height, screen_width=self.screen_width)
+        self.player_1_reward = 0
+        self.player_2_reward = 0
 
     def get_shooter_state(self):
         return self.get_state(ego_player=self.player1, other_player=self.player2)

@@ -32,6 +32,9 @@ class Player:
         if action == 4 and self.y < self.screen_height:
             self.y += 5
 
+        # if self.is_on_edge_of_screen():
+        #     reward = -50
+
         self.start_pos = (self.x, self.y)
 
         player_radius = 10
@@ -85,6 +88,9 @@ class Player:
             b.update()
 
         return reward
+
+    def is_on_edge_of_screen(self):
+        return self.x <= 0 or self.x >= self.screen_width or self.y <= 0 or self.y >= self.screen_height
 
     def draw(self, screen):
         # Draw the player to the screen
