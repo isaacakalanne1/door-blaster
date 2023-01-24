@@ -1,6 +1,6 @@
 from gameenv import GameEnv
 from ppo import Agent
-from utils import plot_learning_curve
+from helper import plot
 import numpy as np
 
 if __name__ == '__main__':
@@ -13,10 +13,11 @@ if __name__ == '__main__':
     collectorAgent = Agent(n_actions=5, input_dims=env.get_collector_state().shape, batch_size=batch_size, alpha=alpha, n_epochs=n_epochs)
     n_games = 300
 
-    figure_file = 'plots/cartpole.png'
-
     best_score = 10
     score_history = []
+
+    plot_scores = []
+    plot_mean_scores = []
 
     learn_iters = 0
     ag_score = 0
@@ -64,4 +65,6 @@ if __name__ == '__main__':
         print('episode', i, 'score %.1f' % score, 'avg score %.1f' % avg_score, 'time_steps', n_steps,
               'learning_steps', learn_iters)
         x = [i+1 for i in range(len(score_history))]
-        plot_learning_curve(x, score_history, figure_file)
+        plot_scores.append(score)
+        plot_mean_scores.append(avg_score)
+        plot(plot_scores, plot_mean_scores)

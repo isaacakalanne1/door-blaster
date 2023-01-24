@@ -23,6 +23,7 @@ class Door:
         self.health = self.max_health
 
     def update(self, bullets):
+        reward = 0
         # Check for intersections with bullets
         for bullet in bullets:
             if bullet.hit:
@@ -31,6 +32,7 @@ class Door:
             if self.x > bullet.x - self.size and self.x < bullet.x + self.size and self.y > bullet.y - self.size and self.y < bullet.y + self.size:
                 # Decrement the door's health and change the color based on the remaining health
                 self.health -= 10
+                reward += 10
                 if self.health > 50:
                     self.color = (255, 0, 0)  # Red
                 elif self.health > 20:
@@ -43,6 +45,7 @@ class Door:
         # Check if the door's health has reached zero
         if self.health <= 0:
             self.color = (0, 255, 0)  # Green
+        return reward
 
     def draw(self, surface):
         # Draw the door

@@ -20,8 +20,9 @@ class Player:
         self.elapsed_time = 0
 
     def update(self, action, ammo_packs, other_player):
+        reward = 0
         # Update player position based on user input, but don't allow the player to go off the screen
-        keys = pygame.key.get_pressed()
+        # print("Action is " + str(action))
         if action == 1 and self.x > 0:
             self.x -= 5
         if action == 2 and self.x < self.screen_width:
@@ -43,13 +44,15 @@ class Player:
                         and self.y > ammo_pack.y - ammo_pack.radius - player_radius\
                         and self.y < ammo_pack.y + ammo_pack.radius + player_radius:
                     # Remove the ammo pack and add 10 ammo to the player's ammo count
+                    reward += 10
                     ammo_packs.remove(ammo_pack)
                     self.ammo += 10
 
         if self.can_collect_ammo:
             radius = 15
             if self.x > other_player.x - radius and self.x < other_player.x + radius and self.y > other_player.y - radius and self.y < other_player.y + radius:
-                # Transfer all of the player's ammo to the other player
+                # Transfer all the player's ammo to the other player
+                reward += 10
                 other_player.ammo += self.ammo
                 self.ammo = 0
 
@@ -80,6 +83,8 @@ class Player:
         # Update bullet positions
         for b in self.bullets:
             b.update()
+
+        return reward
 
     def draw(self, screen):
         # Draw the player to the screen

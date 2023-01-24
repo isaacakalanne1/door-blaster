@@ -36,6 +36,8 @@ class GameEnv:
         self.enemy = Enemy(screen_height=self.screen_height, screen_width=self.screen_width, enemies=self.enemies)
         self.ammo_packs = []
         self.door = Door(screen_height=self.screen_height, screen_width=self.screen_width)
+        self.player_1_reward = 0
+        self.player_2_reward = 0
 
     def reset_game(self):
         # Reset game objects
@@ -117,7 +119,8 @@ class GameEnv:
             self.ammo_pack_timer = current_time
 
     def take_game_step(self, s_action, c_action):
-        reward = 0
+        self.player_1_reward = 0
+        self.player_2_reward = 0
         done = False
 
         # Handle events
@@ -128,8 +131,8 @@ class GameEnv:
                 if event.key == pygame.K_ESCAPE:
                     done = True
 
-        self.player1.update(s_action, self.ammo_packs, self.player2)
-        self.player2.update(c_action, self.ammo_packs, self.player1)
+        self.player_1_reward += self.player1.update(s_action, self.ammo_packs, self.player2)
+        self.player_2_reward += self.player2.update(c_action, self.ammo_packs, self.player1)
 
         for enemy in self.enemies:
             enemy.update()
@@ -159,24 +162,29 @@ class GameEnv:
         for ammo_pack in self.ammo_packs:
             ammo_pack.draw(self.screen)
 
-        self.door.update(self.player1.bullets + self.player2.bullets)
+        self.player_1_reward += self.door.update(self.player1.bullets + self.player2.bullets)
 
         self.door.draw(self.screen)
 
         for enemy in self.enemies:
-            if self.player1.is_colliding(enemy) or self.player2.is_colliding(enemy):
+            if self.player1.is_colliding(enemy):
                 # reset the game
-                self.reset_game()
+                self.player_1_reward = -50
+                done = True
+                break
+            if self.player2.is_colliding(enemy):
+                # reset the game
+                self.player_2_reward = -50
+                done = True
                 break
 
         # Check if both players are touching the door
-        if self.door.color == (0, 255, 0) \
-                and self.door.x - self.door.size < self.player1.x < self.door.x + self.door.size \
-                and self.door.y - self.door.size < self.player1.y < self.door.y + self.door.size \
-                and self.door.x - self.door.size < self.player2.x < self.door.x + self.door.size \
-                and self.door.y - self.door.size < self.player2.y < self.door.y + self.door.size:
-            # Reset game objects
-            self.reset_game()
+        if self.is_player_touching_door(self.player1):
+            self.player_1_reward = +50
+        if self.is_player_touching_door(self.player2):
+            self.player_2_reward = +50
+        if self.is_player_touching_door(self.player1) and self.is_player_touching_door(self.player2):
+            done = True
 
         # Initialize the font
         font = pygame.font.Font(None, 36)
@@ -199,4 +207,11 @@ class GameEnv:
         # Draw the game to the screen
         self.screen.fill((255, 255, 255))  # Fill the screen with white
 
-        return (self.get_shooter_state(), 0, done), (self.get_collector_state(), 0, done)
+        return (self.get_shooter_state(), self.player_1_reward, done),\
+            (self.get_collector_state(), self.player_2_reward, done)
+
+    def is_player_touching_door(self, player):
+        if self.door.color == (0, 255, 0) \
+                and self.door.x - self.door.size < player.x < self.door.x + self.door.size \
+                and self.door.y - self.door.size < player.y < self.door.y + self.door.size:
+            return True

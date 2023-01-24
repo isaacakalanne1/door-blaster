@@ -136,7 +136,8 @@ class Agent:
         self.critic.load_checkpoint()
 
     def choose_action(self, observation):
-        state = T.tensor([observation], dtype=T.float).to(self.actor.device)
+        observation = np.array(observation)
+        state = T.tensor(observation, dtype=T.float).to(self.actor.device)
 
         dist = self.actor(state)
         value = self.critic(state)
